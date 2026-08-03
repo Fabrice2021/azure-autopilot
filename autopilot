@@ -1,0 +1,57 @@
+<#
+.SYNOPSIS
+  Import d'un appareil dans Windows Autopilot via Microsoft Graph.
+
+.PARAMETER SerialNumber
+  Numéro de série de l'appareil.
+
+.PARAMETER HardwareHash
+  Hash matériel (4K) de l'appareil.
+
+.PARAMETER GroupTag
+  Tag de groupe Autopilot (facultatif, mais recommandé).
+
+.EXAMPLE
+  .\import-autopilot-device.ps1 -SerialNumber "ABC1234" -HardwareHash "BASE64HASH" -GroupTag "PROD"
+#>
+
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$SerialNumber,
+
+    [Parameter(Mandatory = $true)]
+    [string]$HardwareHash,
+
+    [Parameter(Mandatory = $false)]
+    [string]$GroupTag = "DEFAULT"
+)
+
+# Vérification module Graph
+if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.DeviceManagement)) {
+    Write-Host "Installation du module Microsoft.Graph.DeviceManagement..." -ForegroundColor Yellow
+    Install-Module Microsoft.Graph.DeviceManagement -Scope CurrentUser -Force
+}
+
+Import-Module Microsoft.Graph.DeviceManagement
+
+# Connexion à Graph (nécessite une app ou un compte avec les droits Intune)
+Write-Host "Connexion à Microsoft Graph..." -ForegroundColor Cyan
+Connect-MgGraph -Scopes "DeviceManagementServiceConfig.ReadWrite.All"
+
+$body = @{
+    serialNumber       = $SerialNumber
+    hardwareIdentifier = $HardwareHash
+    groupTag           = $GroupTag
+}
+
+Write-Host "Import de l'appareil dans Autopilot..." -ForegroundColor Cyan
+try {
+    $device = New-MgDeviceManagementWindowsAutopilotDeviceIdentity -BodyParameter $body
+    Write-Host "Appareil importé avec succès !" -ForegroundColor Green
+    Write-Host "ID Autopilot : $($device.Id)"
+}
+catch {
+    Write-Host "Erreur lors de l'import Autopilot :" -ForegroundColor Red
+    Write-Host $_.Exception.Message
+    exit 1
+}
